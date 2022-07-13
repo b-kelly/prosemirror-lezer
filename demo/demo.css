@@ -1,0 +1,49 @@
+.ProseMirror {
+    min-height: 300px;
+    border: 1px solid black;
+    padding: 12px 8px;
+}
+
+.tok-link {
+    color: #f00;
+}
+
+.tok-url {
+    color: #00f;
+    text-decoration: underline;
+}
+.tok-heading {
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+.tok-emphasis {
+    font-style: italic;
+}
+.tok-strong {
+    font-weight: bold;
+}
+.tok-meta {
+    color: purple;
+}
+
+.tok-keyword,
+.tok-atom,
+.tok-bool,
+.tok-labelName,
+.tok-inserted,
+.tok-deleted,
+.tok-literal,
+.tok-string,
+.tok-number,
+.tok-variableName,
+.tok-typeName,
+.tok-namespace,
+.tok-className,
+.tok-macroName,
+.tok-propertyName,
+.tok-operator,
+.tok-comment,
+.tok-punctuation,
+.tok-invalid {
+    color: #00f;
+}

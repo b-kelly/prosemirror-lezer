@@ -1,0 +1,6 @@
+demo/
+test/
+.vscode/
+*.js
+*.json
+.github/
