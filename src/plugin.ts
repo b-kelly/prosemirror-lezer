@@ -1,45 +1,38 @@
+import { ChangedRange, TreeFragment } from "@lezer/common";
 import { Node as ProseMirrorNode } from "prosemirror-model";
 import { Plugin, PluginKey, Transaction } from "prosemirror-state";
-import type { Mapping } from "prosemirror-transform";
-import { Decoration, DecorationSet } from "prosemirror-view";
+import { DecorationSet } from "prosemirror-view";
 import {
     getHighlightDecorations,
     ParserCollection,
 } from "./getHighlightDecorations";
-
-// TODO `map` is not actually part of the exposed api for Decoration,
-// so we have to add our own type definitions to expose it
-declare module "prosemirror-view" {
-    interface Decoration {
-        /** @internal */
-        map: (
-            mapping: Mapping,
-            offset: number,
-            oldOffset: number
-        ) => Decoration;
-    }
-}
 
 /**
  * Describes the current state of the highlightPlugin
  * @internal
  */
 export interface HighlightPluginState {
-    cache: DecorationCache;
+    cache: TreeFragmentCache;
     decorations: DecorationSet;
 }
 
 /**
- * Represents a cache of doc positions to the node and decorations at that position
+ * Represents a cache of doc positions to the node and parsed tree fragments
  * @internal
  */
-export class DecorationCache {
+export class TreeFragmentCache {
     private cache: {
-        [pos: number]: { node: ProseMirrorNode; decorations: Decoration[] };
+        [pos: number]: {
+            node: ProseMirrorNode;
+            fragments: readonly TreeFragment[];
+        };
     };
 
     constructor(cache: {
-        [pos: number]: { node: ProseMirrorNode; decorations: Decoration[] };
+        [pos: number]: {
+            node: ProseMirrorNode;
+            fragments: readonly TreeFragment[];
+        };
     }) {
         this.cache = { ...cache };
     }
@@ -48,7 +41,10 @@ export class DecorationCache {
      * Gets the cache entry at the given doc position, or null if it doesn't exist
      * @param pos The doc position of the node you want the cache for
      */
-    get(pos: number): { node: ProseMirrorNode; decorations: Decoration[] } {
+    get(pos: number): {
+        node: ProseMirrorNode;
+        fragments: readonly TreeFragment[];
+    } {
         return this.cache[pos] || null;
     }
 
@@ -56,14 +52,18 @@ export class DecorationCache {
      * Sets the cache entry at the given position with the give node/decoration values
      * @param pos The doc position of the node to set the cache for
      * @param node The node to place in cache
-     * @param decorations The decorations to place in cache
+     * @param fragments The decorations to place in cache
      */
-    set(pos: number, node: ProseMirrorNode, decorations: Decoration[]): void {
+    set(
+        pos: number,
+        node: ProseMirrorNode,
+        fragments: readonly TreeFragment[]
+    ): void {
         if (pos < 0) {
             return;
         }
 
-        this.cache[pos] = { node, decorations };
+        this.cache[pos] = { node, fragments };
     }
 
     /**
@@ -77,10 +77,10 @@ export class DecorationCache {
         oldPos: number,
         newPos: number,
         node: ProseMirrorNode,
-        decorations: Decoration[]
+        fragments: readonly TreeFragment[]
     ): void {
         this.remove(oldPos);
-        this.set(newPos, node, decorations);
+        this.set(newPos, node, fragments);
     }
 
     /**
@@ -92,13 +92,13 @@ export class DecorationCache {
     }
 
     /**
-     * Invalidates the cache by removing all decoration entries on nodes that have changed,
+     * Invalidates the cache by annotating entries on nodes that have changed,
      * updating the positions of the nodes that haven't and removing all the entries that have been deleted;
      * NOTE: this does not affect the current cache, but returns an entirely new one
      * @param tr A transaction to map the current cache to
      */
-    invalidate(tr: Transaction): DecorationCache {
-        const returnCache = new DecorationCache(this.cache);
+    invalidate(tr: Transaction): TreeFragmentCache {
+        const returnCache = new TreeFragmentCache(this.cache);
         const mapping = tr.mapping;
         Object.keys(this.cache).forEach((k) => {
             const pos = +k;
@@ -109,20 +109,36 @@ export class DecorationCache {
 
             const result = mapping.mapResult(pos);
             const mappedNode = tr.doc.nodeAt(result.pos);
-            const { node, decorations } = this.get(pos);
+            const { node, fragments } = this.get(pos);
+
+            const changes = tr.mapping.maps.flatMap((s) => {
+                const changes: ChangedRange[] = [];
+                s.forEach(
+                    (
+                        oldStart: number,
+                        oldEnd: number,
+                        newStart: number,
+                        newEnd: number
+                    ) => {
+                        changes.push({
+                            fromA: oldStart,
+                            toA: oldEnd,
+                            fromB: newStart,
+                            toB: newEnd,
+                        });
+                    }
+                );
+                return changes;
+            });
 
             if (result.deleted || !mappedNode?.eq(node)) {
                 returnCache.remove(pos);
             } else if (pos !== result.pos) {
-                // update the decorations' from/to values to match the new node position
-                const updatedDecorations = decorations
-                    .map((d) => d.map(mapping, 0, 0))
-                    .filter((d) => d !== null);
                 returnCache.replace(
                     pos,
                     result.pos,
                     mappedNode,
-                    updatedDecorations
+                    TreeFragment.applyChanges(fragments, changes)
                 );
             }
         });
@@ -151,14 +167,15 @@ export function highlightPlugin(
             const params = node.attrs.params as string;
             return detectedLanguage || params?.split(" ")[0] || "";
         };
-    const getDecos = (doc: ProseMirrorNode, cache: DecorationCache) => {
+
+    const getDecos = (doc: ProseMirrorNode, cache: TreeFragmentCache) => {
         const content = getHighlightDecorations(
             doc,
             parsers,
             nodeTypes,
             extractor,
             {
-                preRenderer: (_, pos) => cache.get(pos)?.decorations,
+                preRenderer: (_, pos) => cache.get(pos)?.fragments,
                 postRenderer: (b, pos, decorations) => {
                     cache.set(pos, b, decorations);
                 },
@@ -175,7 +192,7 @@ export function highlightPlugin(
         key,
         state: {
             init(_, instance) {
-                const cache = new DecorationCache({});
+                const cache = new TreeFragmentCache({});
                 const result = getDecos(instance.doc, cache);
                 return {
                     cache: cache,

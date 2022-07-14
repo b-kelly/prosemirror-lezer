@@ -1,4 +1,4 @@
-import type { Parser } from "@lezer/common";
+import { Parser, TreeFragment } from "@lezer/common";
 import { classHighlighter, highlightTree } from "@lezer/highlight";
 import type { Node as ProseMirrorNode } from "prosemirror-model";
 import { Decoration } from "prosemirror-view";
@@ -40,23 +40,26 @@ function getNodesOfType(
  */
 interface GetHighlightDecorationsOptions {
     /**
-     * A method that is called before the render process begins where any non-null return value cancels the render; useful for decoration caching on untouched nodes
+     * A method that is called before the render process begins; allows for incremental parsing of a node's contents
      * @param block The node that is about to render
      * @param pos The position in the document of the node
-     * @returns An array of the decorations that should be used instead of rendering; cancels the render if a non-null value is returned
+     * @returns An array of potentially annotated TreeFragments to enable incremental parsing
      */
-    preRenderer?: (block: ProseMirrorNode, pos: number) => Decoration[] | null;
+    preRenderer?: (
+        block: ProseMirrorNode,
+        pos: number
+    ) => readonly TreeFragment[] | null;
 
     /**
-     * A method that is called after the render process ends with the result of the node render passed; useful for decoration caching
+     * A method that is called after the render process ends with the result of the node render passed; allows for saving the result for incremental parsing
      * @param block The node that was renderer
      * @param pos The position of the node in the document
-     * @param decorations The decorations that were rendered for this node
+     * @param fragments The TreeFragments that were rendered for this node
      */
     postRenderer?: (
         block: ProseMirrorNode,
         pos: number,
-        decorations: Decoration[]
+        fragments: readonly TreeFragment[]
     ) => void;
 }
 
@@ -91,15 +94,11 @@ export function getHighlightDecorations(
     let decorations: Decoration[] = [];
 
     blocks.forEach((b) => {
+        let existingFragments: readonly TreeFragment[] | undefined;
+
         // attempt to run the prerenderer if it exists
         if (options?.preRenderer) {
-            const prerenderedDecorations = options.preRenderer(b.node, b.pos);
-
-            // if the returned decorations are non-null, use them instead of rendering our own
-            if (prerenderedDecorations) {
-                decorations = [...decorations, ...prerenderedDecorations];
-                return;
-            }
+            existingFragments = options.preRenderer(b.node, b.pos) ?? undefined;
         }
 
         const language = languageExtractor(b.node) || "*";
@@ -110,10 +109,9 @@ export function getHighlightDecorations(
             return;
         }
 
-        const result = parser.parse(b.node.textContent);
+        const result = parser.parse(b.node.textContent, existingFragments);
 
         const localDecorations: Decoration[] = [];
-
         highlightTree(result, classHighlighter, (from, to, classes) => {
             const decoration = Decoration.inline(
                 from + b.pos + 1,
@@ -126,9 +124,8 @@ export function getHighlightDecorations(
             localDecorations.push(decoration);
         });
 
-        // TODO Store the tree in the cache as well so we can do incremental parsing
         if (options?.postRenderer) {
-            options.postRenderer(b.node, b.pos, localDecorations);
+            options.postRenderer(b.node, b.pos, TreeFragment.addTree(result));
         }
 
         decorations = [...decorations, ...localDecorations];
