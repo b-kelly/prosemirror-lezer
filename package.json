@@ -1,7 +1,7 @@
 {
     "name": "prosemirror-lezer",
     "version": "0.0.1",
-    "description": "",
+    "description": "ProseMirror plugin to highlight code with Lezer grammars",
     "keywords": [
         "prosemirror",
         "lezer"
@@ -9,14 +9,23 @@
     "homepage": "https://github.com/b-kelly/prosemirror-lezer",
     "license": "MIT",
     "author": "Ben Kelly",
-    "main": "dist/index.js",
+    "type": "module",
+    "main": "dist/index.umd.cjs",
+    "module": "dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "import": "./dist/index.js",
+            "require": "./dist/index.umd.cjs"
+        }
+    },
     "repository": {
         "type": "git",
         "url": "https://github.com/b-kelly/prosemirror-lezer.git"
     },
     "scripts": {
-        "start": "webpack serve --open --config webpack.develop.js",
-        "build": "webpack",
+        "start": "vite serve demo",
+        "build": "tsc && vite build",
         "test": "jest",
         "prepublishOnly": "npm run build"
     },
@@ -33,11 +42,9 @@
         "@types/jest": "^28.1.5",
         "@typescript-eslint/eslint-plugin": "^5.30.6",
         "@typescript-eslint/parser": "^5.30.6",
-        "css-loader": "^6.7.1",
         "eslint": "^8.19.0",
         "eslint-config-prettier": "^8.5.0",
         "eslint-plugin-jest": "^26.5.3",
-        "html-webpack-plugin": "^5.5.0",
         "jest": "^28.1.3",
         "jest-environment-jsdom": "^28.1.3",
         "prettier": "^2.7.1",
@@ -45,13 +52,9 @@
         "prosemirror-keymap": "^1.2.0",
         "prosemirror-transform": "^1.6.0",
         "prosemirror-view": "^1.26.5",
-        "style-loader": "^3.3.1",
         "ts-jest": "^28.0.5",
-        "ts-loader": "^9.3.1",
         "typescript": "^4.7.4",
-        "webpack": "^5.73.0",
-        "webpack-cli": "^4.10.0",
-        "webpack-dev-server": "^4.9.3"
-    },
-    "types": "./dist/index.d.ts"
+        "vite": "^3.0.0",
+        "vite-plugin-dts": "^1.3.0"
+    }
 }
