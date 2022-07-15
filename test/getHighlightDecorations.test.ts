@@ -1,6 +1,6 @@
+import { TreeFragment } from "@lezer/common";
 import { parser } from "@lezer/markdown";
 import { DOMParser, Schema } from "prosemirror-model";
-import type { Decoration } from "prosemirror-view";
 import { getHighlightDecorations } from "../src";
 import { createDoc, escapeHtml } from "./helpers";
 
@@ -75,7 +75,8 @@ describe("getHighlightDecorations", () => {
         expect(decorations).toHaveLength(0);
     });
 
-    it.skip("should not highlight on a missing language with no fallback", () => {
+    it("should not highlight on a missing language with no fallback", () => {
+        const fn = jest.fn();
         const doc = createDoc([
             { code: `System.out.println("hello world!");` },
         ]);
@@ -83,52 +84,35 @@ describe("getHighlightDecorations", () => {
             doc,
             parsers,
             ["code_block"],
-            () => null
-        );
-
-        expect(decorations).toBeTruthy();
-        expect(decorations).not.toHaveLength(0);
-    });
-
-    it.skip("should highlight on a missing language when a fallback is set", () => {
-        const doc = createDoc([
-            { code: `System.out.println("hello world!");` },
-        ]);
-        const decorations = getHighlightDecorations(
-            doc,
-            parsers,
-            ["code_block"],
-            () => null
-        );
-
-        expect(decorations).toBeTruthy();
-        expect(decorations).not.toHaveLength(0);
-    });
-
-    it("should cancel on non-null prerender", () => {
-        const doc = createDoc([
-            { code: `**Hello** _world_!`, language: "markdown" },
-        ]);
-        const decorations = getHighlightDecorations(
-            doc,
-            parsers,
-            ["code_block"],
-            () => "markdown",
+            () => null,
             {
-                preRenderer: (node, pos) => {
-                    expect(node).not.toBeNull();
-                    expect(node.type.name).toBe("code_block");
-                    expect(typeof pos === "number").toBe(true);
-                    return [];
-                },
+                postRenderer: fn,
             }
         );
 
         expect(decorations).toBeTruthy();
-        expect(decorations).toHaveLength(0);
+        expect(decorations).not.toHaveLength(0);
+        expect(fn).not.toBeCalled();
     });
 
-    it("should continue on null prerender", () => {
+    it("should highlight on a missing language when a fallback is set", () => {
+        const doc = createDoc([{ code: `**Hello** _world_!` }]);
+        const decorations = getHighlightDecorations(
+            doc,
+            {
+                "*": parser,
+            },
+            ["code_block"],
+            () => null
+        );
+
+        expect(decorations).toBeTruthy();
+        expect(decorations).not.toHaveLength(0);
+    });
+
+    it.todo("should parse iteratively on non-null preRenderer response");
+
+    it("should continue on null preRenderer response", () => {
         const doc = createDoc([
             { code: `**Hello** _world_!`, language: "markdown" },
         ]);
@@ -146,8 +130,8 @@ describe("getHighlightDecorations", () => {
         expect(decorations).not.toHaveLength(0);
     });
 
-    it("should call postrender", () => {
-        let renderedDecorations: Decoration[] = [];
+    it("should call postRenderer", () => {
+        let fragments: readonly TreeFragment[] = [];
 
         const doc = createDoc([
             { code: `**Hello** _world_!`, language: "markdown" },
@@ -158,19 +142,19 @@ describe("getHighlightDecorations", () => {
             ["code_block"],
             () => "markdown",
             {
-                postRenderer: (node, pos, decos) => {
+                postRenderer: (node, pos, frags) => {
                     expect(node).not.toBeNull();
                     expect(node.type.name).toBe("code_block");
                     expect(typeof pos).toBe("number");
 
-                    renderedDecorations = decos;
+                    fragments = frags;
                 },
             }
         );
 
         expect(decorations).toBeTruthy();
         expect(decorations).not.toHaveLength(0);
-        expect(decorations).toEqual(renderedDecorations);
+        expect(fragments).not.toHaveLength(0);
     });
 
     it("should support highlighting the doc node itself", () => {
