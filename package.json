@@ -1,6 +1,6 @@
 {
     "name": "prosemirror-lezer",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "description": "ProseMirror plugin to highlight code with Lezer grammars",
     "keywords": [
         "prosemirror",
