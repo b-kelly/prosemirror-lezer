@@ -1,5 +1,5 @@
 import { Parser, TreeFragment } from "@lezer/common";
-import { classHighlighter, highlightTree } from "@lezer/highlight";
+import { classHighlighter, Highlighter, highlightTree } from "@lezer/highlight";
 import type { Node as ProseMirrorNode } from "prosemirror-model";
 import { Decoration } from "prosemirror-view";
 
@@ -61,6 +61,9 @@ interface GetHighlightDecorationsOptions {
         pos: number,
         fragments: readonly TreeFragment[]
     ) => void;
+
+    /** The highlighter to use when highlighting the tree; defaults to {@link @lezer/highlight.classHighlighter} if unset */
+    highlighter?: Highlighter;
 }
 
 /**
@@ -112,17 +115,21 @@ export function getHighlightDecorations(
         const result = parser.parse(b.node.textContent, existingFragments);
 
         const localDecorations: Decoration[] = [];
-        highlightTree(result, classHighlighter, (from, to, classes) => {
-            const decoration = Decoration.inline(
-                from + b.pos + 1,
-                to + b.pos + 1,
-                {
-                    class: classes,
-                }
-            );
+        highlightTree(
+            result,
+            options?.highlighter || classHighlighter,
+            (from, to, classes) => {
+                const decoration = Decoration.inline(
+                    from + b.pos + 1,
+                    to + b.pos + 1,
+                    {
+                        class: classes,
+                    }
+                );
 
-            localDecorations.push(decoration);
-        });
+                localDecorations.push(decoration);
+            }
+        );
 
         if (options?.postRenderer) {
             options.postRenderer(b.node, b.pos, TreeFragment.addTree(result));

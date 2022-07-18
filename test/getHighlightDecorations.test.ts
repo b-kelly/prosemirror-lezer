@@ -112,6 +112,8 @@ describe("getHighlightDecorations", () => {
 
     it.todo("should parse iteratively on non-null preRenderer response");
 
+    it.todo("should use a passed custom highlighter");
+
     it("should continue on null preRenderer response", () => {
         const doc = createDoc([
             { code: `**Hello** _world_!`, language: "markdown" },
