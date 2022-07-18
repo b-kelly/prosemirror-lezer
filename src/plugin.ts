@@ -1,4 +1,5 @@
 import { ChangedRange, TreeFragment } from "@lezer/common";
+import { Highlighter } from "@lezer/highlight";
 import { Node as ProseMirrorNode } from "prosemirror-model";
 import { Plugin, PluginKey, Transaction } from "prosemirror-state";
 import { DecorationSet } from "prosemirror-view";
@@ -152,12 +153,14 @@ export class TreeFragmentCache {
  * @param parsers An object containing pre-configured lezer parsers keyed by language; supports "*" as a fallback
  * @param nodeTypes An array containing all the node types to target for highlighting
  * @param languageExtractor A method that is passed a prosemirror node and returns the language string to use when highlighting that node; defaults to using `node.attrs.params`
+ * @param highlighter The highlighter to use when highlighting the tree; defaults to {@link @lezer/highlight.classHighlighter} if unset
  * @public
  */
 export function highlightPlugin(
     parsers: ParserCollection,
     nodeTypes: string[] = ["code_block"],
-    languageExtractor?: (node: ProseMirrorNode) => string
+    languageExtractor?: (node: ProseMirrorNode) => string,
+    highlighter?: Highlighter
 ): Plugin<HighlightPluginState> {
     const extractor =
         languageExtractor ||
@@ -179,6 +182,7 @@ export function highlightPlugin(
                 postRenderer: (b, pos, decorations) => {
                     cache.set(pos, b, decorations);
                 },
+                highlighter,
             }
         );
 
